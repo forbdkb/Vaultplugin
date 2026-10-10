@@ -1,0 +1,12 @@
+name: VaultPlugin
+version: 1.0.0
+main: me.companion.vault.VaultPlugin
+api-version: '1.21'
+author: Companion
+description: Personal vault plugin with 54 slots
+
+commands:
+  pv:
+    description: Opens your personal vault
+    usage: /pv [player]
+    aliases: [plotvault, vault]
