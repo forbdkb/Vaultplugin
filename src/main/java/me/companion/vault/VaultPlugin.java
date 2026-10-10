@@ -1,6 +1,9 @@
 package me.companion.vault;
 
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class VaultPlugin extends JavaPlugin {
@@ -12,20 +15,29 @@ public final class VaultPlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
 
-        // تهيئة التخزين
         vaultStorage = new VaultStorage(this);
 
-        // تسجيل الأحداث
         getServer().getPluginManager().registerEvents(new VaultListener(this, vaultStorage), this);
 
-        // تسجيل الأمر
         if (getCommand("pv") != null) {
             getCommand("pv").setExecutor(new PlotVaultCommand(vaultStorage));
         } else {
             getLogger().warning("Command 'pv' not found in plugin.yml!");
         }
 
-        // جدولة النسخ الاحتياطي كل ساعة
+        // 🔄 حفظ دوري كل 30 ثانية لكل الصناديق المفتوحة
+        Bukkit.getScheduler().runTaskTimer(this, () -> {
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                Inventory top = p.getOpenInventory().getTopInventory();
+                InventoryHolder holder = top.getHolder();
+                if (holder instanceof PlotVaultHolder) {
+                    PlotVaultHolder vh = (PlotVaultHolder) holder;
+                    vaultStorage.saveVault(vh.getOwnerUuid(), top.getContents());
+                }
+            }
+        }, 20L * 30, 20L * 30);
+
+        // 💾 نسخ احتياطي كل ساعة
         Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
             vaultStorage.backup();
         }, 20L * 60 * 60, 20L * 60 * 60);
@@ -36,6 +48,16 @@ public final class VaultPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (vaultStorage != null) {
+            // 🛡️ حفظ كل الصناديق المفتوحة أول شي
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                Inventory top = p.getOpenInventory().getTopInventory();
+                InventoryHolder holder = top.getHolder();
+                if (holder instanceof PlotVaultHolder) {
+                    PlotVaultHolder vh = (PlotVaultHolder) holder;
+                    vaultStorage.saveVault(vh.getOwnerUuid(), top.getContents());
+                }
+            }
+            // ثم حفظ الملف النهائي
             vaultStorage.saveAll();
             getLogger().info("All vaults saved.");
         }
