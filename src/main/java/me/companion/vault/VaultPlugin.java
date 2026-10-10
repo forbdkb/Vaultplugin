@@ -25,7 +25,7 @@ public final class VaultPlugin extends JavaPlugin {
             getLogger().warning("Command 'pv' not found in plugin.yml!");
         }
 
-        // 🔄 حفظ دوري كل 30 ثانية لكل الصناديق المفتوحة
+        // 🔄 حفظ دوري كل 60 ثانية (بدل 30) للأصناف المفتوحة فقط
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             for (Player p : Bukkit.getOnlinePlayers()) {
                 Inventory top = p.getOpenInventory().getTopInventory();
@@ -35,9 +35,9 @@ public final class VaultPlugin extends JavaPlugin {
                     vaultStorage.saveVault(vh.getOwnerUuid(), top.getContents());
                 }
             }
-        }, 20L * 30, 20L * 30);
+        }, 20L * 60, 20L * 60);
 
-        // 💾 نسخ احتياطي كل ساعة
+        // 💾 نسخ احتياطي كل ساعة (async — ما يأثر على السيرفر)
         Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
             vaultStorage.backup();
         }, 20L * 60 * 60, 20L * 60 * 60);
@@ -48,7 +48,7 @@ public final class VaultPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (vaultStorage != null) {
-            // 🛡️ حفظ كل الصناديق المفتوحة أول شي
+            // 🛡️ حفظ كل الصناديق المفتوحة
             for (Player p : Bukkit.getOnlinePlayers()) {
                 Inventory top = p.getOpenInventory().getTopInventory();
                 InventoryHolder holder = top.getHolder();
@@ -57,7 +57,6 @@ public final class VaultPlugin extends JavaPlugin {
                     vaultStorage.saveVault(vh.getOwnerUuid(), top.getContents());
                 }
             }
-            // ثم حفظ الملف النهائي
             vaultStorage.saveAll();
             getLogger().info("All vaults saved.");
         }
