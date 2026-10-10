@@ -1,13 +1,11 @@
 package me.companion.vault;
 
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -22,6 +20,9 @@ public class VaultListener implements Listener {
         this.storage = storage;
     }
 
+    /**
+     * ✅ الحفظ الأساسي — عند إغلاق الصندوق.
+     */
     @EventHandler(priority = EventPriority.HIGH)
     public void onClose(InventoryCloseEvent event) {
         InventoryHolder holder = event.getInventory().getHolder();
@@ -38,9 +39,9 @@ public class VaultListener implements Listener {
     }
 
     /**
-     * حفظ فوري عند كل تعديل + حماية من العبث.
+     * ✅ حماية فقط — بدون حفظ (الحفظ يصير عند الإغلاق أو دورياً).
      */
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onClick(InventoryClickEvent event) {
         InventoryHolder holder = event.getInventory().getHolder();
         if (!(holder instanceof PlotVaultHolder)) return;
@@ -51,32 +52,11 @@ public class VaultListener implements Listener {
         if (!vaultHolder.getViewerUuid().equals(event.getWhoClicked().getUniqueId())
                 && !event.getWhoClicked().isOp()) {
             event.setCancelled(true);
-            return;
         }
-
-        // حفظ فوري بعد النبضة (عشان العنصر يكون انحط)
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            storage.saveVault(vaultHolder.getOwnerUuid(), event.getInventory().getContents());
-        });
     }
 
     /**
-     * حفظ عند السحب والإفلات.
-     */
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onDrag(InventoryDragEvent event) {
-        InventoryHolder holder = event.getInventory().getHolder();
-        if (!(holder instanceof PlotVaultHolder)) return;
-
-        PlotVaultHolder vaultHolder = (PlotVaultHolder) holder;
-
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            storage.saveVault(vaultHolder.getOwnerUuid(), event.getInventory().getContents());
-        });
-    }
-
-    /**
-     * حفظ عند خروج اللاعب.
+     * ✅ الحفظ عند خروج اللاعب.
      */
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
