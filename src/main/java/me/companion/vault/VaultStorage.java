@@ -4,10 +4,15 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.io.BukkitObjectInputStream;
+import org.bukkit.util.io.BukkitObjectOutputStream;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
 
@@ -38,60 +43,118 @@ public class VaultStorage {
         }
     }
 
+    /**
+     * حفظ الصندوق بطريقة Base64 (الطريقة الصحيحة).
+     */
     public void saveVault(UUID owner, ItemStack[] contents) {
         synchronized (lock) {
             if (contents == null) return;
             try {
-                config.set("vaults." + owner.toString() + ".items", contents);
+                String encoded = encodeItems(contents);
+                config.set("vaults." + owner.toString() + ".data", encoded);
                 config.set("vaults." + owner.toString() + ".lastSave", System.currentTimeMillis());
-                config.save(file);
-            } catch (IOException e) {
+                atomicSave();
+            } catch (Exception e) {
                 plugin.getLogger().severe("Failed to save vault for " + owner + ": " + e.getMessage());
             }
         }
     }
 
+    /**
+     * استرجاع الصندوق من Base64.
+     */
     public ItemStack[] loadVault(UUID owner) {
         synchronized (lock) {
-            Object raw = config.get("vaults." + owner.toString() + ".items");
-            if (raw instanceof ItemStack[]) {
-                ItemStack[] items = (ItemStack[]) raw;
+            try {
+                String encoded = config.getString("vaults." + owner.toString() + ".data");
+                if (encoded == null || encoded.isEmpty()) {
+                    return new ItemStack[54];
+                }
+                ItemStack[] items = decodeItems(encoded);
                 if (items.length == 54) {
                     return items;
                 }
                 ItemStack[] fixed = new ItemStack[54];
                 System.arraycopy(items, 0, fixed, 0, Math.min(items.length, 54));
                 return fixed;
+            } catch (Exception e) {
+                plugin.getLogger().severe("Failed to load vault for " + owner + ": " + e.getMessage());
+                return new ItemStack[54];
             }
-            return new ItemStack[54];
         }
     }
 
     public void deleteVault(UUID owner) {
         synchronized (lock) {
             config.set("vaults." + owner.toString(), null);
-            try {
-                config.save(file);
-            } catch (IOException e) {
-                plugin.getLogger().severe("Failed to delete vault: " + e.getMessage());
-            }
+            atomicSave();
         }
     }
 
     public boolean hasVault(UUID owner) {
         synchronized (lock) {
-            return config.contains("vaults." + owner.toString());
+            return config.contains("vaults." + owner.toString() + ".data");
         }
     }
 
     public void saveAll() {
         synchronized (lock) {
+            atomicSave();
+        }
+    }
+
+    /**
+     * حفظ آمن (Atomic) — يمنع تلف الملف.
+     */
+    private void atomicSave() {
+        try {
+            File tempFile = new File(file.getParentFile(), file.getName() + ".tmp");
+            config.save(tempFile);
+            java.nio.file.Files.move(
+                tempFile.toPath(),
+                file.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE
+            );
+        } catch (IOException e) {
+            // إذا فشل Atomic، نجرب الطريقة العادية
             try {
                 config.save(file);
-            } catch (IOException e) {
-                plugin.getLogger().severe("Failed to save all vaults: " + e.getMessage());
+            } catch (IOException ex) {
+                plugin.getLogger().severe("Failed to save vaults.yml: " + ex.getMessage());
             }
         }
+    }
+
+    /**
+     * تحويل ItemStack[] إلى نص Base64.
+     */
+    private String encodeItems(ItemStack[] items) throws IOException {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        BukkitObjectOutputStream dataOutput = new BukkitObjectOutputStream(outputStream);
+
+        dataOutput.writeInt(items.length);
+        for (ItemStack item : items) {
+            dataOutput.writeObject(item);
+        }
+        dataOutput.close();
+        return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+    }
+
+    /**
+     * تحويل نص Base64 إلى ItemStack[].
+     */
+    private ItemStack[] decodeItems(String data) throws IOException, ClassNotFoundException {
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(Base64.getDecoder().decode(data));
+        BukkitObjectInputStream dataInput = new BukkitObjectInputStream(inputStream);
+
+        int size = dataInput.readInt();
+        ItemStack[] items = new ItemStack[size];
+        for (int i = 0; i < size; i++) {
+            items[i] = (ItemStack) dataInput.readObject();
+        }
+        dataInput.close();
+        return items;
     }
 
     public void backup() {
@@ -118,9 +181,7 @@ public class VaultStorage {
         long weekAgo = System.currentTimeMillis() - (7L * 24 * 60 * 60 * 1000);
         for (File f : files) {
             if (f.lastModified() < weekAgo) {
-                if (f.delete()) {
-                    plugin.getLogger().info("Deleted old backup: " + f.getName());
-                }
+                f.delete();
             }
         }
     }
