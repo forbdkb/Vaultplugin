@@ -22,9 +22,6 @@ public class VaultListener implements Listener {
         this.storage = storage;
     }
 
-    /**
-     * حفظ عند إغلاق الصندوق
-     */
     @EventHandler(priority = EventPriority.HIGH)
     public void onClose(InventoryCloseEvent event) {
         InventoryHolder holder = event.getInventory().getHolder();
@@ -41,7 +38,7 @@ public class VaultListener implements Listener {
     }
 
     /**
-     * حفظ فوري عند كل تعديل + حماية من العبث
+     * حفظ فوري عند كل تعديل + حماية من العبث.
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onClick(InventoryClickEvent event) {
@@ -57,14 +54,14 @@ public class VaultListener implements Listener {
             return;
         }
 
-        // حفظ بعد نبضة
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        // حفظ فوري بعد النبضة (عشان العنصر يكون انحط)
+        Bukkit.getScheduler().runTask(plugin, () -> {
             storage.saveVault(vaultHolder.getOwnerUuid(), event.getInventory().getContents());
-        }, 1L);
+        });
     }
 
     /**
-     * حفظ عند السحب والإفلات
+     * حفظ عند السحب والإفلات.
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDrag(InventoryDragEvent event) {
@@ -73,13 +70,13 @@ public class VaultListener implements Listener {
 
         PlotVaultHolder vaultHolder = (PlotVaultHolder) holder;
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        Bukkit.getScheduler().runTask(plugin, () -> {
             storage.saveVault(vaultHolder.getOwnerUuid(), event.getInventory().getContents());
-        }, 1L);
+        });
     }
 
     /**
-     * حفظ عند خروج اللاعب
+     * حفظ عند خروج اللاعب.
      */
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
